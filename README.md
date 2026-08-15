@@ -7,11 +7,7 @@ Helbing, Keltsch, and Molnar introduce a model to describe pedestrian motion to 
 
 Let $G(\vec r, t):=$ the ground condition at position $\vec r$ and time $t$. This reflects the comfort of walking, where pedestrians (or 'active walkers') prefer higher values of $G$. Trails are charecterized by these high values of $G$.
 
-Pedestrians, $\alpha$, at their position $\vec r = \vec r _\alpha (t)$ leave 'footprints.' These footprints have an assumed intensity.
-
-Let $I(\vec r):=$ the base intensity of how much a single footstep "wears the ground at position r" (independant of trail history). The assumed intensity of foot traffic is $I(\vec r)*[1- G(\vec r , t)/G_{max}(\vec r, t)]$. This causes a saturation effect by new footprints. 
-
-If that didn't make sense, consider $G(\vec r , t)/G_{max}(\vec r, t)$ to be how close to fully-worm a piece of ground already is as a fraction from 0 to 1. For new grass, this value is 0 and the intensity is $I(\vec r)[1-0]=I(\vec t)$ and for warn grass, where this value approaches 1, $I(\vec r)[1-1]=0$. This is the same shape as logistic growth: the closer you get to the max, the smaller each additional contirbution becomes (a nice condition to prevent our trails from becoming infinitely worn and instead maintains the existing trail).
+Pedestrians, $\alpha$, at their position $\vec r = \vec r _\alpha (t)$ leave 'footprints.' These footprints have an assumed intensity. Let $I(\vec r):=$ the base intensity of how much a single footstep "wears the ground at position r" (independant of trail history). The assumed intensity of foot traffic is $I(\vec r)*[1- G(\vec r , t)/G_{max}(\vec r, t)]$. This causes a saturation effect by new footprints, where the closer you get to the max, the smaller each additional contribution becomes. 
 
 The ground can also regenerate, restoring the ground to its intitial conditions, $G_0(\vec r)$. The restoration is charecterized by a 'weathering rate,' $\frac{1}{T(\vec r)}$ where $T(\vec r)$ describes the durability of the trail (this rate describes the weathering of the trail, not the ground. I know, bad terminology).
 
@@ -58,7 +54,7 @@ $v_\alpha^0$ is just a scalar: the walker's preferred speed (the original author
 
 
 ### Recap Of The Full Model 
-$\vec e_\alpha$ was just a unit vector scaling $v_\alpha^0$ linearly — substitute it straight into the equation of motion and drop it as its own line. Three coupled equations:
+Substituting $\vec e_\alpha$ into the equation of motion, three coupled equations:
 
 $$
 \begin{aligned}
@@ -71,10 +67,36 @@ $$
 Ground wears and regenerates ($G$), attractiveness aggregates that wear over a walker's field of view ($V_{tr}$), and the walker moves at their preferred speed toward a blend of destination and attractiveness ($d\vec r_\alpha/dt$) which wears the ground again, closing the loop.
 
 
-The paper notes that we can collapse this whole model down to two dimenionless parameters:
+### Rescaling
 
- Rescale position and time by the model's only two natural scales, $\tilde{\vec r} = \vec r/\sigma$ (length, in units of visibility range) and $\tilde t = t/T$ (time, in units of trail durability). $G$ needs no rescaling; it's already dimensionless.
- 
+The model has only two natural scales, $\sigma$ (length) and $T$ (time), so measure everything in those units: $\tilde{\vec r} = \vec r/\sigma$ and $\tilde t = t/T$. $G$ is already dimensionless.
+
+Everything else cancels. $V_{tr}$ and the direction $\vec e_\alpha$ come out parameter-free, and the only constants left are
+
+$$
+\kappa = \frac{IT}{\sigma^2}, \qquad \lambda = \frac{V^0 T}{\sigma}
+$$
+
+where $V^0$ is the average preferred speed. This is the version to actually implement:
+
+$$
+\begin{aligned}
+\frac{d\tilde G}{d\tilde t} &= \left[\tilde G_0 - \tilde G\right] + \kappa\left[1 - \frac{\tilde G}{\tilde G_{max}}\right] \sum_{\alpha} \delta^2(\tilde{\vec r} - \tilde{\vec r}_\alpha) \\[6pt]
+\tilde V_{tr}(\tilde{\vec r}_\alpha, \tilde t) &= \int d^2\tilde r \; e^{-\|\tilde{\vec r} - \tilde{\vec r}_\alpha\|} \, \tilde G(\tilde{\vec r}, \tilde t) \\[6pt]
+\frac{d\tilde{\vec r}_\alpha}{d\tilde t} &= \lambda_\alpha \, \frac{(\tilde{\vec d}_\alpha - \tilde{\vec r}_\alpha) + \tilde\nabla \tilde V_{tr}}{\left\|(\tilde{\vec d}_\alpha - \tilde{\vec r}_\alpha) + \tilde\nabla \tilde V_{tr}\right\|}
+\end{aligned}
+$$
+
+
+Small $\kappa$ promotes destination-following and large $\kappa$ promotes trail-following behavior.
+
+$\lambda$ is the walker's speed in rescaled units:
+
+$$
+\lambda = \frac{T}{\sigma / V^0} = \frac{\text{trail lifetime}}{\text{time to cross your own sight radius}}
+$$
+
+So $\lambda$ counts how many sight-crossings fit inside one trail lifetime. 
 
 
 

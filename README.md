@@ -13,13 +13,13 @@ The ground can also regenerate, restoring the ground to its intitial conditions,
 
 
 With this, we can describe the change in our ground condition with respect to time to be: 
-$$
+```math
 \begin{aligned}
 \frac{dG(\vec r, t)}{dt} = \;
 & \underbrace{\frac{1}{T(\vec r)}\left[G_0(\vec r) - G(\vec r, t)\right]}_{\text{regeneration toward } G_0} \\
 & + \underbrace{I(\vec r)\left[1 - \frac{G(\vec r, t)}{G_{max}(\vec r, t)}\right]}_{\text{saturating wear per footstep}} \cdot \underbrace{\sum_{\alpha} \delta(\vec r - \vec r_\alpha(t))}_{\text{only where a walker stands}}
 \end{aligned}
-$$
+```
 
 Next, we need to model a pedestrian's affinity for the ground beneath them. Let $V_{tr}(\vec r_\alpha, t):=$ the trail potential: how attractive the surrounding ground looks to walker $\alpha$, standing at $\vec r_\alpha$, at time $t$.
 
@@ -56,13 +56,13 @@ $v_\alpha^0$ is just a scalar: the walker's preferred speed (the original author
 ### Recap Of The Full Model 
 Substituting $\vec e_\alpha$ into the equation of motion, three coupled equations:
 
-$$
+```math
 \begin{aligned}
-\frac{dG(\vec r, t)}{dt} &= \frac{1}{T(\vec r)}\left[G_0(\vec r) - G(\vec r, t)\right] + I(\vec r)\left[1 - \frac{G(\vec r, t)}{G_{max}(\vec r)}\right] \sum_{\alpha} \delta(\vec r - \vec r_\alpha(t)) \\[6pt]
-V_{tr}(\vec r_\alpha, t) &= \int d^2r \; e^{-|\vec r - \vec r_\alpha|/\sigma(\vec r_\alpha)} \, G(\vec r, t) \\[6pt]
+\frac{dG(\vec r, t)}{dt} &= \frac{1}{T(\vec r)}\left[G_0(\vec r) - G(\vec r, t)\right] + I(\vec r)\left[1 - \frac{G(\vec r, t)}{G_{max}(\vec r)}\right] \sum_{\alpha} \delta(\vec r - \vec r_\alpha(t)) \\
+V_{tr}(\vec r_\alpha, t) &= \int d^2r \; e^{-|\vec r - \vec r_\alpha|/\sigma(\vec r_\alpha)} \, G(\vec r, t) \\
 \frac{d\vec r_\alpha}{dt} &= v_\alpha^0 \, \frac{(\vec d_\alpha - \vec r_\alpha) + \nabla_{r_\alpha} V_{tr}(\vec r_\alpha, t)}{\left|(\vec d_\alpha - \vec r_\alpha) + \nabla_{r_\alpha} V_{tr}(\vec r_\alpha, t)\right|}
 \end{aligned}
-$$
+```
 
 Ground wears and regenerates ($G$), attractiveness aggregates that wear over a walker's field of view ($V_{tr}$), and the walker moves at their preferred speed toward a blend of destination and attractiveness ($d\vec r_\alpha/dt$) which wears the ground again, closing the loop.
 
@@ -79,13 +79,13 @@ $$
 
 where $V^0$ is the average preferred speed. This is the version to actually implement:
 
-$$
+```math
 \begin{aligned}
-\frac{d\tilde G}{d\tilde t} &= \left[\tilde G_0 - \tilde G\right] + \kappa\left[1 - \frac{\tilde G}{\tilde G_{max}}\right] \sum_{\alpha} \delta^2(\tilde{\vec r} - \tilde{\vec r}_\alpha) \\[6pt]
-\tilde V_{tr}(\tilde{\vec r}_\alpha, \tilde t) &= \int d^2\tilde r \; e^{-\|\tilde{\vec r} - \tilde{\vec r}_\alpha\|} \, \tilde G(\tilde{\vec r}, \tilde t) \\[6pt]
+\frac{d\tilde G}{d\tilde t} &= \left[\tilde G_0 - \tilde G\right] + \kappa\left[1 - \frac{\tilde G}{\tilde G_{max}}\right] \sum_{\alpha} \delta^2(\tilde{\vec r} - \tilde{\vec r}_\alpha) \\
+\tilde V_{tr}(\tilde{\vec r}_\alpha, \tilde t) &= \int d^2\tilde r \; e^{-\|\tilde{\vec r} - \tilde{\vec r}_\alpha\|} \, \tilde G(\tilde{\vec r}, \tilde t) \\
 \frac{d\tilde{\vec r}_\alpha}{d\tilde t} &= \lambda_\alpha \, \frac{(\tilde{\vec d}_\alpha - \tilde{\vec r}_\alpha) + \tilde\nabla \tilde V_{tr}}{\left\|(\tilde{\vec d}_\alpha - \tilde{\vec r}_\alpha) + \tilde\nabla \tilde V_{tr}\right\|}
 \end{aligned}
-$$
+```
 
 
 Small $\kappa$ promotes destination-following and large $\kappa$ promotes trail-following behavior.

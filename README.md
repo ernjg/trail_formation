@@ -13,7 +13,7 @@ Pedestrians wear down the ground wherever they walk. The worn ground is more com
 ## Documentation
 
 - [MODEL.md](MODEL.md) — the derivation of the model
-- [IMPLEMENTATION.md](IMPLEMENTATION.md) — the implementation
+- [IMPLEMENTATION.md](IMPLEMENTATION.md) — the implementation approach
 
 ---
 Why TypeScript? I didn't know TypeScript, so this was a good excuse to learn.

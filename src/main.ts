@@ -10,24 +10,66 @@ const potCtx = potCanvas.getContext("2d")!;
 
 
 
-// render step. map a scalar field to colors and write them into a canvas
-// scale takes the field to [0,1]; from/to are the ends of the color ramp
+// render step. map a scalar field to colors and write them into a canvas.
+// scale takes the field to [0,1]; stops are the ramp, walked end to end, so
+// three of them put a transition colour at the halfway point.
 function render(
   field: Float32Array,
   img: ImageData,
   scale: number,
-  from: number[],
-  to: number[],
+  stops: number[][],
+  noise: Float32Array | null = null,
 ) {
+  const segments = stops.length - 1;
+
   for (let p = 0; p < field.length; p++) {
     let v = field[p] * scale;
     v = v < 0 ? 0 : v > 1 ? 1 : v;
 
-    img.data[p * 4 + 0] = from[0] + (to[0] - from[0]) * v;
-    img.data[p * 4 + 1] = from[1] + (to[1] - from[1]) * v;
-    img.data[p * 4 + 2] = from[2] + (to[2] - from[2]) * v;
+    // which segment of the ramp, and how far along it
+    const t = v * segments;
+    const k = Math.min(segments - 1, Math.floor(t));
+    const f = t - k;
+    const from = stops[k];
+    const to = stops[k + 1];
+
+    const n = noise ? noise[p] : 0;
+
+    // Uint8ClampedArray clamps, so the offset needs no bounds check
+    img.data[p * 4 + 0] = from[0] + (to[0] - from[0]) * f + n;
+    img.data[p * 4 + 1] = from[1] + (to[1] - from[1]) * f + n;
+    img.data[p * 4 + 2] = from[2] + (to[2] - from[2]) * f + n;
     img.data[p * 4 + 3] = 255;
   }
+}
+
+
+// A brightness offset per sell so the ground has more texture
+// two octabe, a course and smooth noise
+function buildNoise(N: number): Float32Array {
+  const COARSE = 8;
+  const M = Math.ceil(N / COARSE) + 1;
+
+  const low = new Float32Array(M * M);
+  for (let p = 0; p < low.length; p++) low[p] = Math.random() * 2 - 1;
+
+  const out = new Float32Array(N * N);
+  for (let j = 0; j < N; j++) {
+    const jy = j / COARSE, j0 = Math.floor(jy), fy = jy - j0;
+
+    for (let i = 0; i < N; i++) {
+      const ix = i / COARSE, i0 = Math.floor(ix), fx = ix - i0;
+
+      // bilinear blend of the coarse lattice
+      const a = low[j0 * M + i0], b = low[j0 * M + i0 + 1];
+      const c = low[(j0 + 1) * M + i0], d = low[(j0 + 1) * M + i0 + 1];
+      const patch = (a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy;
+
+      out[j * N + i] = patch * NOISE_COARSE + (Math.random() * 2 - 1) * NOISE_FINE;
+    }
+  }
+
+  return out;
 }
 
 
@@ -90,10 +132,17 @@ function markGates(sim: Sim, img: ImageData) {
 }
 
 // colors!
-const GRASS = [74, 124, 58];
-const DIRT = [166, 137, 96];
-const COLD = [0, 0, 0];
-const HOT = [255, 255, 255];
+const NOISE_COARSE = 5; // patchiness, in colour units out of 255
+const NOISE_FINE = 2; // per-cell grain
+
+// fresh grass -> trampled dead grass -> bare packed earth
+const GROUND = [
+  [ 74, 124,  58],
+  [150, 130,  88],
+  [148, 143, 134],
+];
+
+const POTENTIAL = [[0, 0, 0], [255, 255, 255]];
 
 // the little heads of people
 const HAIR = [
@@ -121,6 +170,7 @@ function main(){
   canvas.width = simulation.N;
   canvas.height = simulation.N;
   const img = ctx.createImageData(simulation.N, simulation.N);
+  const noise = buildNoise(simulation.N);
 
   //for the potential map
   potCanvas.width = simulation.N;
@@ -136,7 +186,7 @@ function main(){
       simulation.update();
     }
 
-    render(simulation.G, img, 1 / simulation.Gmax, GRASS, DIRT);
+    render(simulation.G, img, 1 / simulation.Gmax, GROUND, noise);
     markWalkers(simulation, img);
     ctx.putImageData(img, 0, 0);
 
@@ -146,7 +196,7 @@ function main(){
     for (let p = 0; p < simulation.V.length; p++) {
       if (simulation.V[p] > vMax) vMax = simulation.V[p];
     }
-    render(simulation.V, potImg, vMax > 0 ? 1 / vMax : 0, COLD, HOT);
+    render(simulation.V, potImg, vMax > 0 ? 1 / vMax : 0, POTENTIAL);
     markGates(simulation, potImg);
     potCtx.putImageData(potImg, 0, 0);
 

@@ -179,10 +179,18 @@ function main(){
 
   // sim loop. Each frame runs a fixed number of steps then paints once
   //returning between frames lets the browser repaint
-  const STEPS_PER_FRAME = 10;
+  let stepsPerFrame = 1;
+  const speed = document.querySelector<HTMLInputElement>("#speed")!;
+  const speedOut = document.querySelector<HTMLSpanElement>("#speedOut")!;
+
+  speed.addEventListener("input", () => {
+    stepsPerFrame = Number(speed.value);
+    speedOut.textContent = `x${speed.value}`
+  }
+)
 
   function frame() {
-    for (let i = 0; i < STEPS_PER_FRAME; i++) {
+    for (let i = 0; i < stepsPerFrame; i++) {
       simulation.update();
     }
 

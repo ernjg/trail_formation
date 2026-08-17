@@ -29,6 +29,8 @@ $$
 V_{tr}(\vec r_\alpha, t) = \int d^2r \; \underbrace{e^{-|\vec r - \vec r_\alpha|/\sigma(\vec r_\alpha)}}_{\text{decreases with distance, scaled by visibility}} \; \underbrace{G(\vec r, t)}_{\text{ground condition at } \vec r}
 $$
 
+![Trail potential for two trail systems, with walkers overlaid](ref_pot.png)
+
 
 Now we can discuss the walking direction $\vec e_\alpha$ of a pedestrian. There are two seperate attractors:
 - **The Destination**. If a walker has a goal $d_\alpha$ and the ground is homogenous ($G(\vec r, t)$ is a constant), just go straight to it. $\frac{(\vec d_\alpha - \vec r_\alpha)}{|\vec d_\alpha - \vec r_\alpha|}$. 
@@ -87,7 +89,9 @@ where $V^0$ is the average preferred speed. This is the version to actually impl
 ```
 
 
-Small $\kappa$ promotes destination-following and large $\kappa$ promotes trail-following behavior.
+Small $\kappa$ promotes destination-following and large $\kappa$ promotes trail-following behavior (see figure below).
+
+![Three trail systems between the same three points, at increasing kappa](ref_trail.png)
 
 $\lambda$ is the walker's speed in rescaled units:
 

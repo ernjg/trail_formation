@@ -10,22 +10,42 @@
       canvas {
         width: 512px;
         border: 1px solid #000;
+        background: #301b06;
+      }
+      label {
+        display: block;
+        margin-bottom: 0.5rem;
+      }
+
+
+      .canvases {
+        display: flex;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 1rem;
       }
     </style>
 
   </head>
 
   <body>
+
     <p>Hello little self-organizing world!</p>
-    <p id="stats"></p>
 
-    <canvas id="sim">
-      Your browser does not support the HTML canvas tag.
-    </canvas>
+    <label>
+      Simulation Speed: <span id="speedOut">x1</span>
+      <input type = "range" id="speed" min="1" max="200" value ="1">
+    </label>
 
-    <canvas id="pot">
-      Your browser does not support the HTML canvas tag.
-    </canvas>
+
+    <div class="canvases">
+      <canvas id="sim">
+        Your browser does not support the HTML canvas tag.
+      </canvas>
+      <canvas id="pot">
+        Your browser does not support the HTML canvas tag.
+      </canvas>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 

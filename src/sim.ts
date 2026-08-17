@@ -58,7 +58,7 @@ function randomGates(n: number, L: number): Float32Array[] {
     const span = L - 2 * margin;
 
     // rejected if too near another gate, so a draw can't cluster them in a corner
-    const minGap = 0.1 * span;
+    const minGap = 0.2 * span;
     const gates: Float32Array[] = [];
 
     for (let attempt = 0; gates.length < n && attempt < 2000; attempt++) {
@@ -92,7 +92,7 @@ export class Sim {
     G0 = 0; // natural ground condition (unworn grass)
     L = 30; // side length of the ground, in sight radii
     h: number; //side length of ground unit
-    max_walkers = 150; 
+    max_walkers = 250; 
 
     // FFT stuff for the trail potential. M is the zero-padded width
     //  the padding stops the convolution wrapping around the domain

@@ -15,6 +15,7 @@ Pedestrians wear down the ground wherever they walk. The worn ground is more com
 *I've been playing a lot of city simulation games, so I was inspired to make my own living, self-organizing little world.*
 
 ## From the paper
+Our compute is far better than theirs was. So we can do better than these renders.
 
 ![Three trail systems between the same three points, at increasing kappa](ref_trail.png)
 

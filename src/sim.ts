@@ -1,50 +1,77 @@
 import FFT from "fft.js"
 
 class Walker {
-    start: Float32Array;
-    end: Float32Array;
+    // how many steps between stuck checks, and how much of the distance walked
+    // in that window has to turn into real progress
+    static CHECK_EVERY = 10;
+    static MIN_PROGRESS = 0.25;
+
     pos: Float32Array;
+    dest: Gate;
     ep: number;
+    sinceCheck = 0;
+    markX: number;   // where it was at the last check
+    markY: number;
 
-    constructor(start: Float32Array, end: Float32Array) {
-        this.start = start;
-        this.end = end;
-        this.pos = new Float32Array(start);
+    constructor(at: Float32Array, dest: Gate) {
+        this.dest = dest;
+        this.pos = new Float32Array(at);
+        this.ep = 0.5;
+        this.markX = this.pos[0];
+        this.markY = this.pos[1];
+    }
 
-        this.ep = 1;
+    // a fresh destination also resets the progress window
+    retarget(dest: Gate) {
+        this.dest = dest;
+        this.sinceCheck = 0;
+        this.markX = this.pos[0];
+        this.markY = this.pos[1];
     }
 
     // Destination pull is a unit direction, deviated from exact mathematical model
     // needs |grad V| < 1, or the two cancel and the walker stalls (super annoying)
     advance(gradV: (x: number, y: number) => [number, number], dt: number, lambda: number) {
-        const toEndX = this.end[0] - this.pos[0];
-        const toEndY = this.end[1] - this.pos[1];
-        const remaining = Math.sqrt(toEndX * toEndX + toEndY * toEndY);
+        const dx = this.dest.pos[0] - this.pos[0];
+        const dy = this.dest.pos[1] - this.pos[1];
+        const remaining = Math.hypot(dx,dy);
 
         const [gx, gy] = gradV(this.pos[0], this.pos[1]);
 
-        const ux = toEndX / remaining + gx;
-        const uy = toEndY / remaining + gy;
+        const ux = dx / remaining + gx;
+        const uy = dy / remaining + gy;
 
-        const norm = Math.sqrt(ux * ux + uy * uy);
-        if (norm < 1e-12) return; // direction undefined, don't move
+        const norm = Math.hypot(ux, uy);
+        if (norm < 1e-12) return false; // direction undefined, don't move
 
         const step = lambda * dt;
 
         this.pos[0] += step * ux / norm;
         this.pos[1] += step * uy / norm;
-
-        this.end_check();
-    }
-
-    end_check() {
         // if the walker is epsilon close to it's destination, it swaps directions
-        if (Math.sqrt(Math.pow(this.pos[0] - this.end[0], 2) + Math.pow(this.pos[1] - this.end[1], 2)) < this.ep){
-            this.pos = new Float32Array(this.end);
-            let temp = this.start;
-            this.start = this.end;
-            this.end = temp;
+        if (Math.hypot(this.pos[0] - this.dest.pos[0], this.pos[1] - this.dest.pos[1]) < this.ep){
+            this.pos[0] = this.dest.pos[0];
+            this.pos[1] = this.dest.pos[1];
+            return true;
         }
+
+        // Every step covers exactly `step`, so being stuck never shows up as a
+        // short step -- it shows up as full-speed steps that cancel out. Compare
+        // net displacement against the distance actually walked.
+        this.sinceCheck++;
+        if (this.sinceCheck >= Walker.CHECK_EVERY) {
+            const net = Math.hypot(this.pos[0] - this.markX, this.pos[1] - this.markY);
+            const walked = step * this.sinceCheck;
+
+            this.sinceCheck = 0;
+            this.markX = this.pos[0];
+            this.markY = this.pos[1];
+
+            // hemmed in by terrain it can't get around: give it somewhere else to be
+            if (net < walked * Walker.MIN_PROGRESS) return true;
+        }
+
+        return false;
     }
 
 }
@@ -53,13 +80,15 @@ class Walker {
 
 // n gates at random points on the ground, kept off the boundary so a walker
 // standing on one still deposits its whole footprint on the grid.
-function randomGates(n: number, L: number): Float32Array[] {
+export type Gate = { pos: Float32Array; score:number};
+
+function randomGates(n: number, L: number): Gate[] {
     const margin = 0.1 * L;
     const span = L - 2 * margin;
 
     // rejected if too near another gate, so a draw can't cluster them in a corner
     const minGap = 0.2 * span;
-    const gates: Float32Array[] = [];
+    const gates: Gate[] = [];
 
     for (let attempt = 0; gates.length < n && attempt < 2000; attempt++) {
         const x = margin + Math.random() * span;
@@ -67,10 +96,10 @@ function randomGates(n: number, L: number): Float32Array[] {
 
         let tooClose = false;
         for (const g of gates) {
-            if (Math.hypot(g[0] - x, g[1] - y) < minGap) { tooClose = true; break; }
+            if (Math.hypot(g.pos[0] - x, g.pos[1] - y) < minGap) { tooClose = true; break; }
         }
 
-        if (!tooClose) gates.push(new Float32Array([x, y]));
+        if (!tooClose) gates.push({pos: new Float32Array([x,y]), score: 1});
     }
 
     return gates;
@@ -87,12 +116,15 @@ export class Sim {
     kappa: number; // wear intensity: small favours destinations, large favours trails
     lambda: number; // walker speed
     k_approx: number; // number of steps between V updates
-    gates: Float32Array[]; // array of gate positions
+    gates: Gate[]; // array of gate ={pos:float32array;score number}
     frameCount: number; // counter for the number of steps that have passed
-    G0 = 0; // natural ground condition (unworn grass)
+    // natural ground condition per cell. 0 is plain grass; negative is terrain
+    // nobody wants to walk on (mud, water), which puts a dip in V and so pushes
+    // walkers away; positive is a pre-existing path that attracts them.
+    G0: Float32Array;
     L = 30; // side length of the ground, in sight radii
     h: number; //side length of ground unit
-    max_walkers = 250; 
+    walkersPerScore = 15; 
 
     // FFT stuff for the trail potential. M is the zero-padded width
     //  the padding stops the convolution wrapping around the domain
@@ -110,15 +142,16 @@ export class Sim {
         kappa: number = 3,
         lambda: number = 300,
         k_approx: number = 16,
-        gates: Float32Array[] = [],
+        gates: Gate[] = [],
     ) {
         this.dt = dt;
         this.N = N;
         this.G = new Float32Array(N * N);
+        this.G0 = new Float32Array(N * N);   // all grass until something paints it
         this.Gmax = Gmax; // constant for now, could be a function of position
         this.kappa = kappa;
         this.lambda = lambda;
-        this.gates = gates.length ? gates : randomGates(15, this.L);
+        this.gates = gates.length ? gates : randomGates(3, this.L);
         this.k_approx = k_approx;
         this.frameCount = 0;
 
@@ -138,7 +171,7 @@ export class Sim {
 
 
         this.walkers = []
-        this.generateWalkers();
+        this.syncPopulation();
     }
 
     // V = h^2 (G * K). Conv is a pointwise product in fourier space
@@ -225,33 +258,25 @@ export class Sim {
         }
     }
 
-    generateWalkers(){
-        // the initial set of walkers.
-        const num_gates = this.gates.length;
+    syncPopulation(spawnAt: Gate|null = null){
+        let totalScore = 0;
+        for (const g of this.gates) totalScore+=g.score;
+        const target = Math.round(this.walkersPerScore*totalScore);
 
-        const pairs: [number, number][] = [];
-
-        // generate all possible gate start/end pairs
-        for (let i=0; i<num_gates;i++){
-            for (let j=i+1;j<num_gates;j++){
-                pairs.push([i,j])
-            }
+        //walkers are exchangable lol, so which onces get cut doesnt matter
+        while (this.walkers.length>target){
+            this.walkers.splice(Math.floor(Math.random()*this.walkers.length),1);
         }
 
-
-        // assign the pairs to our walkers
-        for (let w =0; w<this.max_walkers;w++){
-            const [i,j] = pairs[w%pairs.length]
-            const walker = new Walker(this.gates[i], this.gates[j])
-
-            // scattered rather than stacked on their start gate, so they don't
-            // travel as one clump and lay every trail at once
-            walker.pos[0] = Math.random() * this.L;
-            walker.pos[1] = Math.random() * this.L;
-
-            this.walkers.push(walker)
+        while (this.walkers.length<target){
+                const home = spawnAt ?? this.pickGate(null);
+                const w = new Walker(home.pos, this.pickGate(home));
+                if (!spawnAt){
+                    w.pos[0]=Math.random()*this.L;
+                    w.pos[1]=Math.random()*this.L;
+                }
+                this.walkers.push(w)
         }
-
     }
 
 
@@ -266,7 +291,9 @@ export class Sim {
         const gradV = (x: number, y: number) => this.gradV(x, y);
 
         for (const walker of this.walkers) {
-            walker.advance(gradV, this.dt, this.lambda);
+            if (walker.advance(gradV, this.dt, this.lambda)){
+                walker.retarget(this.pickGate(walker.dest));
+            }
         }
     }
 
@@ -293,8 +320,10 @@ export class Sim {
         const c = this.kappa / (this.h * this.h);
         for (let i = 0; i<this.G.length;i++){
             const g = this.G[i];
-            const next = g + this.dt*((this.G0 - g) + c*(1 - g/this.Gmax)*deposit[i]);
-            this.G[i] = next < 0 ? 0 : next > this.Gmax ? this.Gmax : next;
+            const g0 = this.G0[i];
+            const next = g + this.dt*((g0 - g) + c*(1 - g/this.Gmax)*deposit[i]);
+            // the floor is G0, not 0: a pond can't be trodden back up to grass
+            this.G[i] = next < g0 ? g0 : next > this.Gmax ? this.Gmax : next;
         }
     }
 
@@ -343,6 +372,56 @@ export class Sim {
         }
 
         return [gx, gy];
+    }
+
+
+    pickGate(exclude: Gate|null): Gate {
+        let total = 0;
+        for (const g of this.gates) {
+            if (g !== exclude) total += g.score;
+        }
+
+        //every other gate has score 0, so there is nothing to prefer
+        if (total <= 0) {
+            for (const g of this.gates) if (g !== exclude) return g;
+            return this.gates[0];
+        }
+
+        // walk the scores until the running total passes a uniform draw
+        let r = Math.random() * total;
+        for (const g of this.gates) {
+            if (g === exclude) continue;
+            r -= g.score;
+            if (r <= 0) return g;
+        }
+
+        //only reachable through floating point drift on the last step
+        for (let i = this.gates.length - 1; i >= 0; i--) {
+            if (this.gates[i] !== exclude) return this.gates[i];
+        }
+        return this.gates[0];
+    }
+
+    addGate(x:number, y:number, score=1):Gate{
+        const gate: Gate = {pos: new Float32Array([x,y]), score};
+        this.gates.push(gate);
+        this.syncPopulation(gate); //new walkers will start at this new gate, yay
+        return gate;
+
+    }
+
+    removeGate(gate: Gate){
+        if (this.gates.length<=2) return; //two is the minimum for a dest to exist
+        const i = this.gates.indexOf(gate);
+        if (i<0) return;
+
+        this.gates.splice(i,1);
+
+        //retarget before trimming or walkers steer at a deleted gate
+        for (const w of this.walkers){
+            if (w.dest===gate) w.dest = this.pickGate(null);
+        }
+        this.syncPopulation();
     }
 
 

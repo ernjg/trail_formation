@@ -11,18 +11,46 @@
         width: 512px;
         border: 1px solid #000;
         background: #301b06;
+        image-rendering: pixelated;
       }
       label {
         display: block;
         margin-bottom: 0.5rem;
       }
 
-
       .canvases {
         display: flex;
         justify-content: center;
         flex-wrap: wrap;
         gap: 1rem;
+        
+      }
+
+      .toolbar {
+        display: flex;
+        align-items: flex-start;
+        gap: 1.5rem;
+        flex-wrap:wrap;
+        margin-bottom:1rem;
+      }
+
+      .tools {
+        display: flex;
+        gap: 0.25rem;
+      }
+
+      .tools button{
+        font: inherit;
+        padding:0.2rem 0.5rem;
+        border:1px solid #30507a;
+        background: #f4f2ee;
+        cursor:pointer;
+      }
+
+      .tools button[aria-pressed="true"] {
+        background: #30507a;
+        border-color:#30507a;
+        color: #fff;
       }
     </style>
 
@@ -37,6 +65,25 @@
       <input type = "range" id="speed" min="1" max="200" value ="1">
     </label>
 
+    <div class = 'toolbar'>
+      <div class = 'tools' id="tools">
+        <button type="button" data-tool="none" aria-pressed="true">None</button>
+        <button type="button" data-tool="gate-add" aria-pressed="false">+ Gate</button>
+        <button type="button" data-tool="gate-remove" aria-pressed="false">- Gate</button>
+        <button type="button" data-tool="brush-add" aria-pressed="false">+ G0</button>
+        <button type="button" data-tool="brush-sub" aria-pressed="false">- G0</button>
+        <button type="button" data-tool="brush-clear" aria-pressed="false">Clear G0</button>
+      </div>
+      <div class ="brush" id="brush" hidden>
+        <label>Thickness <span id="thicknessOut">1.5</span>
+          <input type="range" id="thickness" min="0.2" max = "5" step="0.1" value="1.5"></label>
+        <label>Sharpness <span id="sharpnessOut">2</span>
+          <input type="range" id="sharpness" min="0.5" max = "8" step="0.1" value="2"></label>
+        <label>Strength <span id="strengthOut">0.02</span>
+          <input type="range" id="strength" min="0.002" max="0.1" step="0.002" value="0.02"></label>
+      </div>
+
+    </div>
 
     <div class="canvases">
       <canvas id="sim">
